@@ -258,9 +258,9 @@ function renderRiskForecast(){
  for(const r of selectedRows){
    const date=String(r['발생일자']),qty=Number(r['불량수량']);
    if(!Number.isFinite(qty)||qty<=0||date<prevFrom||date>latest)continue;
-   const model=val(r,'발생모델'),process=val(r,'발생공정'),defect=val(r,'불량명');
-   const key=JSON.stringify([model,process,defect]);
-   if(!groups.has(key))groups.set(key,{model,process,defect,recent:0,previous:0,latest:''});
+   const process=val(r,'발생공정'),cause=val(r,'불량원인'),defect=val(r,'불량명'),detail=val(r,'특이사항');
+   const key=JSON.stringify([process,cause,defect,detail]);
+   if(!groups.has(key))groups.set(key,{process,cause,defect,detail,recent:0,previous:0,latest:''});
    const g=groups.get(key);
    if(date>=recentFrom){g.recent+=qty;if(date>g.latest)g.latest=date;}
    else g.previous+=qty;
@@ -279,9 +279,9 @@ function renderRiskForecast(){
  const levelCls=l=>l==='높음'?'risk-high':l==='주의'?'risk-mid':'risk-low';
  const trendText=g=>g.previous===0?'이전 기간 0 EA':`${g.trend>=1?'▲':'▼'} ${Math.abs((g.recent-g.previous)/g.previous*100).toFixed(0)}%`;
  host.innerHTML=`<div class="risk-summary"><div class="risk-chip"><small>분석 기준일</small><b>${safe(latest)}</b></div><div class="risk-chip"><small>최근 분석기간</small><b>90일</b></div><div class="risk-chip"><small>위험 관리 대상</small><b>${ranked.length}개 조합</b></div></div>
- <div class="risk-grid"><div><h3 style="font-size:14px;margin:0 0 14px">우선 관리 TOP 5</h3>${top.map((g,i)=>`<div class="risk-chart-row" title="${safe(g.model)} / ${safe(g.process)} / ${safe(g.defect)}"><span class="risk-name">${i+1}. ${safe(g.defect)} · ${safe(g.model)}</span><div class="risk-track"><div class="risk-fill" style="width:${Math.max(2,g.score/max*100).toFixed(1)}%"></div></div><span class="risk-score">${(g.score/max*100).toFixed(0)}</span></div>`).join('')}<div class="sub" style="margin-top:12px">최고 위험 조합을 100으로 환산한 상대 점수</div></div>
- <div class="risk-table-wrap"><table class="risk-table"><thead><tr><th>순위</th><th>발생모델</th><th>발생공정</th><th>불량명</th><th>최근 90일</th><th>이전 90일</th><th>변화</th><th>위험등급</th></tr></thead><tbody>${ranked.map((g,i)=>{const l=level(g,i);return `<tr><td><b>${i+1}</b></td><td>${safe(g.model)}</td><td>${safe(g.process)}</td><td><b>${safe(g.defect)}</b></td><td>${fmt(g.recent)} EA</td><td>${fmt(g.previous)} EA</td><td>${trendText(g)}</td><td><span class="risk-level ${levelCls(l)}">${l}</span></td></tr>`}).join('')}</tbody></table></div></div>
- <div class="risk-note"><b>분석 기준</b> · 최근 90일과 그 이전 90일의 불량수량을 비교하고, 증가 추세와 최근 발생 시점을 반영해 예방관리 우선순위를 산정합니다. 전체 기간 필터(년·월·일)와 관계없이 최근 180일을 분석하며 모델·공정·불량명 필터는 적용됩니다. 위험등급은 이 표 안에서의 상대 순위이고, 점수는 실제 미래 발생 확률(%)이 아닙니다. 모델별 생산수량 분모를 연결하지 않았으므로 모델 간 불량률 또는 개별 제품의 불량 발생 확률로 해석하면 안 됩니다. 생산량·설비상태·공정조건 등을 추가하면 향후 예측 모델을 고도화할 수 있습니다.</div>`;
+ <div class="risk-grid"><div><h3 style="font-size:14px;margin:0 0 14px">우선 관리 TOP 5</h3>${top.map((g,i)=>`<div class="risk-chart-row" title="${safe(g.process)} / ${safe(g.cause)} / ${safe(g.defect)} / ${safe(g.detail)}"><span class="risk-name">${i+1}. ${safe(g.process)} · ${safe(g.defect)} · ${safe(g.detail)}</span><div class="risk-track"><div class="risk-fill" style="width:${Math.max(2,g.score/max*100).toFixed(1)}%"></div></div><span class="risk-score">${(g.score/max*100).toFixed(0)}</span></div>`).join('')}<div class="sub" style="margin-top:12px">최고 위험 조합을 100으로 환산한 상대 점수</div></div>
+ <div class="risk-table-wrap"><table class="risk-table"><thead><tr><th>순위</th><th>발생공정</th><th>불량원인</th><th>불량명</th><th>특이사항</th><th>최근 90일</th><th>이전 90일</th><th>변화</th><th>위험등급</th></tr></thead><tbody>${ranked.map((g,i)=>{const l=level(g,i);return `<tr><td><b>${i+1}</b></td><td>${safe(g.process)}</td><td>${safe(g.cause)}</td><td><b>${safe(g.defect)}</b></td><td>${safe(g.detail)}</td><td>${fmt(g.recent)} EA</td><td>${fmt(g.previous)} EA</td><td>${trendText(g)}</td><td><span class="risk-level ${levelCls(l)}">${l}</span></td></tr>`}).join('')}</tbody></table></div></div>
+ <div class="risk-note"><b>분석 기준</b> · 최근 90일과 그 이전 90일의 불량수량을 비교하고, 증가 추세와 최근 발생 시점을 반영해 예방관리 우선순위를 산정합니다. 전체 기간 필터(년·월·일)와 관계없이 최근 180일을 분석하며 모델·공정·불량명 필터는 적용되지만, 발생모델은 위험도 집계 그룹에서 제외합니다. 위험등급은 이 표 안에서의 상대 순위이고, 점수는 실제 미래 발생 확률(%)이 아닙니다. 생산수량 분모를 연결하지 않았으므로 이 점수는 불량률이나 개별 제품의 불량 발생 확률을 의미하지 않습니다. 생산량·설비상태·공정조건 등을 추가하면 향후 예측 모델을 고도화할 수 있습니다.</div>`;
 }
 
 function render(){
