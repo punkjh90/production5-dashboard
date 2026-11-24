@@ -168,14 +168,14 @@ const DEFAULT_SCRAP=[{"발생일자":"2026-01-05","불량명":"이물질","폐�
 let scrapRows=DEFAULT_SCRAP.slice();
 let comparisonMonthKey=null;
 function comparisonKey(){
- const available=[...new Set(rows.map(r=>String(r['발생일자']||'').slice(0,7)).filter(k=>/^\\d{4}-\\d{2}$/.test(k)))].sort();
+ const available=[...new Set(rows.map(r=>String(r['발생일자']||'').slice(0,7)).filter(k=>/^\d{4}-\d{2}$/.test(k)))].sort();
  if(!available.length)return new Date().toISOString().slice(0,7);
  const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
  if(!comparisonMonthKey)comparisonMonthKey=available.includes(today)?today:available[available.length-1];
  return comparisonMonthKey;
 }
 function renderComparisonMonthPicker(){
- const months=[...new Set(rows.map(r=>String(r['발생일자']||'').slice(0,7)).filter(k=>/^\\d{4}-\\d{2}$/.test(k)))].sort().reverse();
+ const months=[...new Set(rows.map(r=>String(r['발생일자']||'').slice(0,7)).filter(k=>/^\d{4}-\d{2}$/.test(k)))].sort().reverse();
  const current=comparisonKey();
  const el=$('comparisonMonthPicker');
  el.innerHTML='<span class="picker-label">비교 기준월 선택</span>'+months.map(k=>`<label><input type="checkbox" data-month="${k}" ${k===current?'checked':''}>${k}</label>`).join('')+'<span class="picker-note">한 달 선택 · 선택한 월과 직전 달 자동 비교 (아래 실패비용 표에도 적용)</span>';
