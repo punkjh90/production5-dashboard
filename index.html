@@ -115,6 +115,18 @@ button:focus-visible,input:focus-visible,select:focus-visible { outline:3px soli
 .risk-trend-head b{overflow-wrap:anywhere}.risk-trend-head span{color:#214c7e;font-size:12px;white-space:nowrap}
 .risk-trend-card svg{display:block;width:100%;height:auto;margin-top:5px}
 .risk-point{fill:#123c71;font-size:14px;font-weight:800;paint-order:stroke;stroke:#f7faff;stroke-width:3px}
+.mom-toggle{min-height:0;padding:4px 0;border:0;background:transparent;color:#14569f;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.mom-toggle::before{content:'▸';display:inline-block;margin-right:7px}
+.mom-toggle[aria-expanded="true"]::before{content:'▾'}
+.mom-toggle:hover{text-decoration:underline}
+.mom-table .mom-detail td{padding:12px;background:#eef5ff}
+.mom-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mom-detail-grid section{background:white;border:1px solid #ceddef;border-radius:8px;padding:10px}
+.mom-detail-grid h4,.mom-detail-grid p{margin:0}
+.mom-detail-grid ul{padding:0;margin:4px 0 0;list-style:none}
+.mom-detail-grid li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid #e4ecf6}
+.mom-detail-grid li span{white-space:pre-wrap;overflow-wrap:anywhere}
+.mom-detail-grid li b{flex-shrink:0}
 </style></head><body><header><div><small>MANUFACTURING QUALITY INTELLIGENCE · TEAM 05</small><h1>Defect Trend <span style="font-weight:400;opacity:.65">/</span> Manufacturing Team5</h1><div style="font-size:12px;color:#c1d5f6">볼뉴머팁 공정불량 통합 분석 대시보드</div></div><div class="tag">PROCESS QUALITY CONTROL</div></header><main class="wrap"><section class="filters" style="margin-bottom:14px;align-items:center">
 <div style="flex:1;min-width:260px"><b>엑셀 데이터 갱신</b></div>
 <label style="cursor:pointer;background:#10295e;color:white;border-radius:7px;padding:11px 15px;font-weight:700">엑셀 불러오기 <input type="file" id="excelUpload" accept=".xlsx,.xls" style="display:none"></label>
@@ -276,7 +288,7 @@ function renderMonthComparison(){
  const host=$('momCompare'),sub=$('momSubtitle');
  const previousKey=comparisonBaseMonth,currentKey=comparisonMonthKey;
  $('momReference').textContent=currentKey?'기준월  '+currentKey:'비교할 월 없음';
- sub.textContent='불량명별 불량률 · 월별 전체 생산수량 기준';
+ sub.textContent='불량명별 불량률 · 불량명을 누르면 월별 특이사항이 펼쳐집니다';
  if(!previousKey||!currentKey){host.innerHTML='<div class="empty">비교하려면 월별 데이터가 두 달 이상 필요합니다.</div>';return}
  const base=rows.filter(r=>hasFilter('model',val(r,'발생모델'))&&hasFilter('process',val(r,'발생공정'))&&hasFilter('defect',val(r,'불량명'))&&Object.entries(path).every(([k,v])=>val(r,k)===v));
  const monthRows=k=>base.filter(r=>String(r['발생일자']||'').slice(0,7)===k);
@@ -293,9 +305,31 @@ function renderMonthComparison(){
   const change=delta===null?'—':(delta>0?'+':'')+delta.toFixed(2)+'%p';
   return `<td>${formatRate(old)}</td><td>${formatRate(now)}</td><td class="${cls}">${change}</td>`;
  };
- const cells=names.map(name=>`<tr><td><b>${safe(name)}</b></td>${rateCells(am.get(name)||0,bm.get(name)||0)}</tr>`).join('');
+ const notesByDefect=data=>{
+  const map=new Map();
+  for(const row of data){
+   const name=val(row,'불량명'),note=String(row['특이사항']??'').trim();
+   if(!map.has(name))map.set(name,new Map());
+   const notes=map.get(name);
+   notes.set(note,(notes.get(note)||0)+(Number(row['불량수량'])||0));
+  }
+  return map;
+ };
+ const oldNotes=notesByDefect(before),newNotes=notesByDefect(after);
+ const notesHtml=(month,notes)=>{
+  const list=[...(notes||[])].sort((a,b)=>b[1]-a[1]);
+  return `<section><h4>${month}</h4>${list.length?`<ul>${list.map(([note,qty])=>`<li><span>${safe(note||'특이사항 미기재')}</span><b>${fmt(qty)} EA</b></li>`).join('')}</ul>`:'<p>발생 내역 없음</p>'}</section>`;
+ };
+ const cells=names.map((name,i)=>`<tr><td><button type="button" class="mom-toggle" aria-expanded="false" aria-controls="mom-detail-${i}">${safe(name)}</button></td>${rateCells(am.get(name)||0,bm.get(name)||0)}</tr><tr id="mom-detail-${i}" class="mom-detail" hidden><td colspan="4"><div class="mom-detail-grid">${notesHtml(previousKey,oldNotes.get(name))}${notesHtml(currentKey,newNotes.get(name))}</div></td></tr>`).join('');
  const total=`<tfoot><tr><th scope="row">합계</th>${rateCells(sum(before),sum(after))}</tr></tfoot>`;
  host.innerHTML=`<div class="mom-wrap"><table class="mom-table"><thead><tr><th>불량명</th><th>${previousKey}<small>비교월 불량률</small></th><th class="mom-current-head">${currentKey}<small>기준월 불량률</small></th><th scope="col">불량률 차이</th></tr></thead><tbody>${cells||'<tr><td colspan="4" class="empty">선택한 두 달에 불량 내역이 없습니다.</td></tr>'}</tbody>${total}</table></div><div class="mom-note">불량률 = 불량수량 ÷ 해당 월 전체 생산수량 × 100. 비교월 생산수량 ${fmt(pa)} EA · 기준월 생산수량 ${fmt(pb)} EA. 생산수량이 없으면 —로 표시합니다.</div>`;
+ for(const button of host.querySelectorAll('.mom-toggle')){
+  button.onclick=()=>{
+   const detail=$(button.getAttribute('aria-controls'));
+   detail.hidden=!detail.hidden;
+   button.setAttribute('aria-expanded',String(!detail.hidden));
+  };
+ }
 }
 
 function renderScrapComparison(){
@@ -307,7 +341,8 @@ function renderScrapComparison(){
  const scoped=scrapRows.filter(r=>hasFilter('model',String(r['발생모델']||''))&&hasFilter('process',String(r['발생공정']||''))&&hasFilter('defect',String(r['불량명']||'')));
  const sums=month=>{const m=new Map();for(const r of scoped){if(String(r['발생일자']).slice(0,7)!==month)continue;const k=String(r['불량명']||'미분류').trim(),v=Number(r['폐기금액'])||0;m.set(k,(m.get(k)||0)+v)}return m};
  const a=sums(prev),b=sums(key);
- const names=[...new Set([...b.keys(),...a.keys()])].sort((x,y)=>(b.get(y)||0)-(b.get(x)||0)||(a.get(y)||0)-(a.get(x)||0)||x.localeCompare(y,'ko'));
+ const defectNames=rows.filter(r=>hasFilter('model',val(r,'발생모델'))&&hasFilter('process',val(r,'발생공정'))&&hasFilter('defect',val(r,'불량명'))).map(r=>val(r,'불량명'));
+ const names=[...new Set([...b.keys(),...a.keys(),...defectNames])].sort((x,y)=>(b.get(y)||0)-(b.get(x)||0)||(a.get(y)||0)-(a.get(x)||0)||x.localeCompare(y,'ko'));
  const total=amounts=>[...amounts.values()].reduce((sum,value)=>sum+value,0);
  const kr=n=>Math.round(n).toLocaleString('ko-KR');
  const amountCells=(old,cur)=>{
@@ -316,7 +351,7 @@ function renderScrapComparison(){
  };
  const rowsHtml=names.map((name,i)=>`<tr><td><b>${String(i+1).padStart(2,'0')} · ${safe(name)}</b></td>${amountCells(a.get(name)||0,b.get(name)||0)}</tr>`).join('');
  const totalsHtml=`<tfoot><tr><th scope="row">합계</th>${amountCells(total(a),total(b))}</tr></tfoot>`;
- host.innerHTML=`<div class="mom-wrap"><table class="mom-table"><thead><tr><th>불량명</th><th>${prev}<small>비교월 실패비용</small></th><th class="mom-current-head">${key}<small>기준월 실패비용</small></th><th scope="col">증감률</th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="4" class="empty">두 달의 TIP 폐기금액 데이터가 없습니다.</td></tr>'}</tbody>${totalsHtml}</table></div><div class="mom-note">TIP 폐기리스트에서 비교월 또는 기준월에 기록된 모든 불량명의 실패비용을 집계합니다. 월 전체를 집계하며, 비교월 0원에서 기준월에 비용이 발생하면 ‘신규 발생’으로 표시합니다.</div>`;
+ host.innerHTML=`<div class="mom-wrap"><table class="mom-table"><thead><tr><th>불량명</th><th>${prev}<small>비교월 실패비용</small></th><th class="mom-current-head">${key}<small>기준월 실패비용</small></th><th scope="col">증감률</th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="4" class="empty">표시할 불량명이 없습니다.</td></tr>'}</tbody>${totalsHtml}</table></div><div class="mom-note">공정불량 데이터의 전체 불량명과 두 달의 TIP 폐기 불량명을 표시합니다. 해당 월에 폐기금액 기록이 없으면 0원으로 표시합니다.</div>`;
 }
 
 // Relative risk priority, not a calibrated future defect probability.
